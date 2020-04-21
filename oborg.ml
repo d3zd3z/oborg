@@ -6,7 +6,82 @@ module Hash = Mirage_crypto.Hash
 module PB = Pbkdf.Make (Hash.SHA256)
 module AESCTR = Mirage_crypto.Cipher_block.AES.CTR
 
+module Unpacker = struct
+  let check_key iref name =
+    if Option.is_some !iref then failwith ("Duplicate key: " ^ name)
+
+  let set_int iref ~name (v : Msgpck.t) =
+    check_key iref name;
+    match v with
+      | Int x -> iref := Some x
+      | _ -> failwith "Invalid type for int"
+
+  let set_int32 iref ~name (v : Msgpck.t) =
+    check_key iref name;
+    match v with
+      | Int x -> iref := Some (Int32.of_int_exn x)
+      | _ -> failwith "Invalid type for int"
+
+  let set_string iref ~name (v : Msgpck.t) =
+    check_key iref name;
+    match v with
+      | String x | Bytes x -> iref := Some x
+      | _ -> failwith "Invalid type for string"
+
+  let set_bool iref ~name (v : Msgpck.t) =
+    check_key iref name;
+    match v with
+      | Bool x -> iref := Some x
+      | _ -> failwith "Invalid type for bool"
+end
+
+module Key = struct
+  open Unpacker
+
+  type t = {
+    version : int;
+    chunk_seed : int32;
+    enc_hmac_key : string;
+    enc_key : string;
+    id_key : string;
+    repository_id : string;
+    tam_required : bool;
+  }
+  [@@deriving show]
+
+  let of_kvs (kvs : (Msgpck.t * Msgpck.t) list) =
+    let version = ref None in
+    let chunk_seed = ref None in
+    let enc_hmac_key = ref None in
+    let enc_key = ref None in
+    let id_key = ref None in
+    let repository_id = ref None in
+    let tam_required = ref None in
+    List.iter kvs ~f:(fun (k, v) -> match k with
+      | String "version" -> set_int ~name:"version" version v
+      | String "chunk_seed" -> set_int32 ~name:"chunk_seed" chunk_seed v
+      | String "enc_hmac_key" -> set_string ~name:"enc_hmac_key" enc_hmac_key v
+      | String "enc_key" -> set_string ~name:"enc_key" enc_key v
+      | String "id_key" -> set_string ~name:"id_key" id_key v
+      | String "repository_id" -> set_string ~name:"repository_id" repository_id v
+      | String "tam_required" -> set_bool ~name:"tam_required" tam_required v
+      | _ -> failwith "Invalid key in map");
+    { version = Option.value_exn !version;
+      chunk_seed = Option.value_exn !chunk_seed;
+      enc_hmac_key = Option.value_exn !enc_hmac_key;
+      enc_key = Option.value_exn !enc_key;
+      id_key = Option.value_exn !id_key;
+      repository_id = Option.value_exn !repository_id;
+      tam_required = Option.value_exn !tam_required; }
+
+  let of_string (msg : Msgpck.t) = match msg with
+    | Map kvs -> of_kvs kvs
+    | _ -> failwith "Invalid packed message"
+end
+
 module KeyWrap = struct
+  open Unpacker
+
   type alg = SHA256
   [@@deriving show]
 
@@ -19,18 +94,6 @@ module KeyWrap = struct
     data : string;
   } [@@deriving show]
 
-  let set_int iref (v : Msgpck.t) =
-    if Option.is_some !iref then failwith "Duplicate key";
-    match v with
-      | Int x -> iref := Some x
-      | _ -> failwith "Invalid type for int"
-
-  let set_string iref (v : Msgpck.t) =
-    if Option.is_some !iref then failwith "Duplicate key";
-    match v with
-      | String x | Bytes x -> iref := Some x
-      | _ -> failwith "Invalid type fo string"
-
   let of_kvs (kvs : (Msgpck.t * Msgpck.t) list) =
     let version = ref None in
     let salt = ref None in
@@ -39,18 +102,18 @@ module KeyWrap = struct
     let hash = ref None in
     let data = ref None in
     List.iter kvs ~f:(fun (k, v) -> match k with
-      | String "version" -> set_int version v
-      | String "salt" -> set_string salt v
-      | String "iterations" -> set_int iterations v
+      | String "version" -> set_int ~name:"version" version v
+      | String "salt" -> set_string ~name:"salt" salt v
+      | String "iterations" -> set_int ~name:"iterations" iterations v
       | String "algorithm" ->
           begin match v with
             | String "sha256" ->
-                if Option.is_some !algorithm then failwith "Duplicate key";
+                check_key algorithm "algorithm";
                 algorithm := Some SHA256
             | _ -> failwith "Invalid algorithm"
           end
-      | String "hash" -> set_string hash v
-      | String "data" -> set_string data v
+      | String "hash" -> set_string ~name:"hash" hash v
+      | String "data" -> set_string ~name:"data" data v
       | _ -> failwith "Invalid key in map");
     { version = Option.value_exn !version;
       salt = Option.value_exn !salt;
@@ -119,7 +182,9 @@ let load_key name =
   let plain = KeyWrap.decode wrap "kao3ohBae0quaMohzu5eemaeghei3Gox8zu" in
   let pos, plain = Msgpck.String.read plain in
   printf "pos: 0x%x\n" pos;
-  printf "inner = %S\n" (Msgpck.show plain)
+  printf "inner = %S\n" (Msgpck.show plain);
+  let keyinfo = Key.of_string plain in
+  printf "inner = %s\n" (Key.show keyinfo)
 
   (* List.iter lines ~f:(fun line -> printf "line: %S\n" line) *)
 
