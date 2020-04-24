@@ -47,6 +47,12 @@ module Unpacker = struct
       match SM.find kvs name with
         | None -> failwith "Field missing in msgpack"
         | Some x -> x)
+
+  (* Reexport Cstruct, with a 'pp' function. *)
+  module Cstruct = struct
+    include Cstruct
+    let pp = hexdump_pp
+  end
 end
 
 (**
@@ -64,8 +70,10 @@ module Key = struct
     repository_id : string;
     tam_required : bool;
   }
+  [@@deriving show]
 
   (* Manual pp and show *)
+  (*
   let show t =
     printf "{\n";
     printf "  version = %d\n" t.version;
@@ -80,6 +88,7 @@ module Key = struct
     Pdump.String.pdump t.repository_id;
     printf "  tam_required = %b\n" t.tam_required;
     printf "}\n"
+  *)
 
   let fields = [
     ("version", `Int);
@@ -112,6 +121,7 @@ module KeyWrap = struct
   open Unpacker
 
   type alg = SHA256
+  [@@deriving show]
 
   let alg_of_string = function
     | "sha256" -> SHA256
@@ -125,6 +135,7 @@ module KeyWrap = struct
     hash : Cstruct.t;
     data : Cstruct.t;
   }
+  [@@deriving show]
 
   let fields = [
     ("version", `Int);
@@ -163,24 +174,13 @@ let splitit line =
     | [key; repoid] -> key, repoid
     | _ -> failwith "Invalid first line"
 
-let load_key ~password path =
-  let lines = In_channel.read_lines path in
-  let key, repoid, lines = match lines with
-    | (x::xs) ->
-        let key, repoid = splitit x in
-        (key, repoid, xs)
-    | _ -> failwith "No lines present in key" in
-
-  if String.(key <> "BORG_KEY") then
-    failwith (sprintf "Unexpected tag %S instead of BORG_KEY" key);
-
-  let bin = Base64.decode_exn (String.concat lines) in
-
+let from_bin ~password bin =
   let pos, payload = Msgpck.String.read bin in
   if pos <> String.length bin then
     failwith "Trailing garbage in base64 key";
 
   let wrap = KeyWrap.of_msg payload in
+  printf "wrap: %s\n" (KeyWrap.show wrap);
   let plain = KeyWrap.decode ~password wrap in
   let pos, plainmsg = Msgpck.String.read plain in
   if pos <> String.length plain then
@@ -189,8 +189,28 @@ let load_key ~password path =
   let plain = Key.of_msg plainmsg in
 
   (* Verify that the incoming repo matches the wrapped one. *)
+  (* TODO: Put this back. *)
+  (*
   let repoid = Cstruct.to_string (Cstruct.of_hex repoid) in
   if not (String.equal repoid plain.repository_id) then
     failwith "Wrapped repo ID mismatch with outer ID";
+  *)
 
   plain
+
+let from_base64 ~password text =
+  let bin = Base64.decode_exn text in
+  from_bin ~password bin
+
+let load_key ~password path =
+  let lines = In_channel.read_lines path in
+  let key, _repoid, lines = match lines with
+    | (x::xs) ->
+        let key, repoid = splitit x in
+        (key, repoid, xs)
+    | _ -> failwith "No lines present in key" in
+
+  if String.(key <> "BORG_KEY") then
+    failwith (sprintf "Unexpected tag %S instead of BORG_KEY" key);
+
+  from_base64 ~password (String.concat lines)

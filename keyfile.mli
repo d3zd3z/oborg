@@ -13,7 +13,9 @@ module Key : sig
     tam_required : bool;
   }
 
-  val show : t -> unit
+  val show : t -> string
+  val pp : Format.formatter -> t -> unit
 end
 
 val load_key : password:Cstruct.t -> string -> Key.t
+val from_base64 : password:Cstruct.t -> string -> Key.t
