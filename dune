@@ -1,5 +1,5 @@
 (executable
   (name oborg)
-  (libraries core base64 msgpck pbkdf mirage-crypto cstruct)
+  (libraries core base64 msgpck pbkdf mirage-crypto cstruct re)
   (preprocess (pps ppx_deriving.show))
   )
