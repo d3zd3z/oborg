@@ -72,24 +72,6 @@ module Key = struct
   }
   [@@deriving show]
 
-  (* Manual pp and show *)
-  (*
-  let show t =
-    printf "{\n";
-    printf "  version = %d\n" t.version;
-    printf "  chunk_seed = %ld\n" t.chunk_seed;
-    printf "  enc_hmac_key:\n";
-    Pdump.Cstruct.pdump t.enc_hmac_key;
-    printf "  enc_key:\n";
-    Pdump.Cstruct.pdump t.enc_key;
-    printf "  id_key:\n";
-    Pdump.Cstruct.pdump t.id_key;
-    printf "  repository_id:\n";
-    Pdump.String.pdump t.repository_id;
-    printf "  tam_required = %b\n" t.tam_required;
-    printf "}\n"
-  *)
-
   let fields = [
     ("version", `Int);
     ("chunk_seed", `Int32);
