@@ -13,9 +13,12 @@ let () =
   printf "%s\n" (Configfile.show conf)
 *)
 
+type il = [`None | `Built of int | `Rebuild of (int * int)] [@@deriving show]
+
 let () =
   match Sys.get_argv () with
     | [| _; path |] ->
       let repo = Repo.openrepo path in
-      printf "%s\n" (Repo.show repo)
+      printf "%s\n" (Repo.show repo);
+      printf "last seg: %s\n" (show_il (Repo.last_segment repo))
     | _ -> failwith "Expecting a path argument"

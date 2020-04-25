@@ -41,3 +41,31 @@ let segfile t n =
   sprintf "%s/data/%d/%d" t.path
     (n mod t.conf.segments_per_dir)
     n
+
+let index_file t n =
+  sprintf "%s/index.%d" t.path n
+
+let index_re = Re.compile (Re.Pcre.re {|^index\.(\d+)$|})
+
+let get_index_files t =
+  let names = Sys.readdir t.path in
+  let names = Array.filter_map names ~f:(Re.exec_opt index_re) in
+  Array.map names ~f:(fun p -> Re.Group.get p 1 |> Int.of_string)
+
+(* Currently, this doesn't check that the segments mentioned in the
+ * index exist.  We mainly care if there are segments beyond the
+ * index, which means the index will need to be rebuilt. *)
+let last_segment t =
+  (* Determine highest numbered index file. *)
+  match Array.max_elt ~compare:Int.compare (get_index_files t) with
+    | None -> `None
+    | Some n ->
+        let last_seg =
+          let rec loop i =
+            if Sys.file_exists_exn (index_file t i) then
+              loop (i + 1)
+            else (i - 1) in
+          loop (n + 1) in
+        if last_seg > n then `Rebuild (n, last_seg)
+        else `Built n
+
