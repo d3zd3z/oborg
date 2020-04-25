@@ -32,7 +32,9 @@ let () =
 
       (* Verify that the hashes can be found. *)
       let count = ref 0 in
-      Hashindex.Index.iter hindex ~f:(fun _key ->
-        count := !count + 1);
+      Hashindex.Index.iter hindex ~f:(fun key ->
+        match Hashindex.Index.find hindex ~key with
+          | Some (_, _) -> count := !count + 1
+          | None -> failwith "Unable to find key");
       printf "Visited: %d\n" !count
     | _ -> failwith "Expecting a path argument"

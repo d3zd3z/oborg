@@ -61,8 +61,6 @@ module Index = struct
       failwith "Index file seems of incorrect length";
     { data; used; buckets }
 
-  (* For testing purposes, iterate over all of the hashes, that are
-   * not marked empty or deleted. *)
   let iter t ~f =
     for pos = 0 to t.buckets - 1 do
       let base = first_bucket + pos * bucket_size in
@@ -71,4 +69,33 @@ module Index = struct
         | 0xfffffffel | 0xffffffffl -> ()
         | _ -> f key
     done
+
+  let find t ~key =
+    (* This is a bit messy as we don't have real unsigned ints in
+     * ocaml.  We can take advantage of the int63 type, which will
+     * either be a regular int on a 64-bit platform, or a 64 bit value
+     * on 32-bit platforms. *)
+    let pos = Cstruct.LE.get_uint32 key 0 in
+    let pos = Int63.(of_int32 pos land of_int64_exn 0xffffffffL) in
+    let pos = Int63.to_int_exn Int63.(rem pos (of_int t.buckets)) in
+    let rec loop pos =
+      let base = first_bucket + bucket_size * pos in
+      if Cstruct.equal key (Cstruct.sub t.data base key_len) then begin
+        let first = Int32.to_int_exn (Cstruct.LE.get_uint32 t.data (base + key_len)) in
+        let second = Int32.to_int_exn (Cstruct.LE.get_uint32 t.data (base + key_len + 4)) in
+        Some (first, second)
+      end else begin
+        match Cstruct.LE.get_uint32 t.data (base + key_len) with
+          | -1l ->
+              (* Indicates an empty bucket, which is our only stop
+               * condition. *)
+              None
+          | _ ->
+              (* Otherwise, it is either the wrong key, or the record
+               * was deleted. *)
+              let pos = pos + 1 in
+              let pos = if pos = t.buckets then 0 else pos in
+              loop pos
+      end in
+    loop pos
 end
