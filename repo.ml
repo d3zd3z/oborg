@@ -46,11 +46,27 @@ let index_file t n =
   sprintf "%s/index.%d" t.path n
 
 let index_re = Re.compile (Re.Pcre.re {|^index\.(\d+)$|})
+let number_re = Re.compile (Re.Pcre.re {|^(\d+)$|})
 
 let get_index_files t =
   let names = Sys.readdir t.path in
   let names = Array.filter_map names ~f:(Re.exec_opt index_re) in
   Array.map names ~f:(fun p -> Re.Group.get p 1 |> Int.of_string)
+
+(* Retrieve an array of all of the numbered files or dirs in a given
+ * directory. *)
+let get_numbered path =
+  Sys.readdir path
+    |> Array.filter_map ~f:(Re.exec_opt number_re)
+    |> Array.map ~f:(fun p -> Re.Group.get p 1 |> Int.of_string)
+
+let get_segment_files t =
+  let dirs = get_numbered (t.path ^/ "data") in
+  let names = Array.map dirs ~f:(fun num ->
+    get_numbered (t.path ^/ "data" ^/ Int.to_string num)) in
+  let names = Array.concat (Array.to_list names) in
+  Array.sort names ~compare:Int.compare;
+  names
 
 (* Currently, this doesn't check that the segments mentioned in the
  * index exist.  We mainly care if there are segments beyond the
@@ -60,12 +76,9 @@ let last_segment t =
   match Array.max_elt ~compare:Int.compare (get_index_files t) with
     | None -> `None
     | Some n ->
-        let last_seg =
-          let rec loop i =
-            if Sys.file_exists_exn (index_file t i) then
-              loop (i + 1)
-            else (i - 1) in
-          loop (n + 1) in
-        if last_seg > n then `Rebuild (n, last_seg)
-        else `Built n
-
+        let segs = get_segment_files t in
+        let segs = Array.filter ~f:(fun x -> x > n) segs in
+        if Array.is_empty segs then
+          `Built n
+        else
+          `Rebuild (n, segs)

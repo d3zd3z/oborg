@@ -13,7 +13,7 @@ let () =
   printf "%s\n" (Configfile.show conf)
 *)
 
-type il = [`None | `Built of int | `Rebuild of (int * int)] [@@deriving show]
+type il = [`None | `Built of int | `Rebuild of (int * int array)] [@@deriving show]
 
 let () =
   match Sys.get_argv () with

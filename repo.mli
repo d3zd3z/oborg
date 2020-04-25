@@ -20,5 +20,5 @@ val index_file : t -> int -> string
  * segment found.  `Rebuild (n, rest) indicates that there is an
  * index, but there are also segment files 'rest' that need to be
  * rebuilt. *)
-val last_segment : t -> [ `None | `Built of int | `Rebuild of int * int ]
+val last_segment : t -> [ `None | `Built of int | `Rebuild of int * int array ]
 
