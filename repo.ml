@@ -3,6 +3,7 @@
 open Core
 
 type t = {
+  path : string;
   conf : Configfile.t;
 }
 [@@deriving show]
@@ -34,4 +35,9 @@ let openrepo path =
     let key = Keyfile.load_key ~password name in
     { conf with key = Some key }
   end in
-  { conf }
+  { path; conf }
+
+let segfile t n =
+  sprintf "%s/data/%d/%d" t.path
+    (n mod t.conf.segments_per_dir)
+    n
