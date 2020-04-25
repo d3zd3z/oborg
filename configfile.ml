@@ -78,13 +78,13 @@ let get_hex map key =
   Map.find_exn map key
   |> Cstruct.of_hex
 
-let load filename =
+let load ~password filename =
   let lines = In_channel.read_lines filename in
   let lines = squash lines in
   let map = decode lines in
   let key = Map.find map "key"
     |> Option.map ~f:(Keyfile.from_base64
-      ~password:(Cstruct.of_string "kao3ohBae0quaMohzu5eemaeghei3Gox8zu")) in
+      ~password) in
   {
     version = get_int map "version";
     segments_per_dir = get_int map "segments_per_dir";

@@ -20,4 +20,4 @@ type t = {
 }
 [@@deriving show]
 
-val load : string -> t
+val load : password:Cstruct.t -> string -> t

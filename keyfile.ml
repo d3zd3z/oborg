@@ -103,7 +103,7 @@ module KeyWrap = struct
   open Unpacker
 
   type alg = SHA256
-  [@@deriving show]
+  (* [@@deriving show] *)
 
   let alg_of_string = function
     | "sha256" -> SHA256
@@ -117,7 +117,7 @@ module KeyWrap = struct
     hash : Cstruct.t;
     data : Cstruct.t;
   }
-  [@@deriving show]
+  (* [@@deriving show] *)
 
   let fields = [
     ("version", `Int);
@@ -162,7 +162,7 @@ let from_bin ~password bin =
     failwith "Trailing garbage in base64 key";
 
   let wrap = KeyWrap.of_msg payload in
-  printf "wrap: %s\n" (KeyWrap.show wrap);
+  (* printf "wrap: %s\n" (KeyWrap.show wrap); *)
   let plain = KeyWrap.decode ~password wrap in
   let pos, plainmsg = Msgpck.String.read plain in
   if pos <> String.length plain then
