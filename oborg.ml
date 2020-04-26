@@ -42,11 +42,5 @@ let () =
       let hindex = Index.of_filename (Repo.index_file repo lseg) in
       Index.dump_info hindex;
 
-      (* Verify that the hashes can be found. *)
-      let count = ref 0 in
-      Index.iter hindex ~f:(fun key ->
-        match Index.find hindex ~key with
-          | Some (_, _) -> count := !count + 1
-          | None -> failwith "Unable to find key");
-      printf "Visited: %d\n" !count
+      Index.lookup_test hindex
     | _ -> failwith "Expecting a path argument"

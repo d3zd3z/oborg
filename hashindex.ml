@@ -35,6 +35,7 @@ module type INDEX = sig
 
   val dump_info : t -> unit
   val iter : t -> f:(Cstruct.t -> unit) -> unit
+  val lookup_test : t -> unit
 end
 
 module Make_index (Data : KV) : INDEX with type data = Data.data = struct
@@ -111,4 +112,27 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
               loop pos
       end in
     loop pos
+
+  let twiddle key offset =
+    let key = Cstruct.copy key 0 Data.key_len in
+    let key = Cstruct.of_string key in
+    let data = Cstruct.get_uint8 key offset in
+    Cstruct.set_uint8 key offset (data lxor 1);
+    key
+
+  let lookup_test t =
+    let count = ref 0 in
+    iter t ~f:(fun key ->
+      begin match find t ~key with
+        | Some _ -> count := !count + 1
+        | None -> failwith "Unable to find key" end;
+      let key2 = twiddle key (Data.key_len - 1) in
+      begin match find t ~key:key2 with
+        | Some _ -> failwith "Should not have found twiddled key"
+        | None -> () end;
+      let key3 = twiddle key 0 in
+      begin match find t ~key:key3 with
+        | Some _ -> failwith "Should not have found 0 twiddled key"
+        | None -> () end);
+    assert (!count = t.used)
 end

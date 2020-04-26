@@ -35,6 +35,9 @@ module type INDEX = sig
 
   (** Iterate over all of the active keys in the index. *)
   val iter : t -> f:(Cstruct.t -> unit) -> unit
+
+  (** A test routine, verifies the integrity of the keys in the hash. *)
+  val lookup_test : t -> unit
 end
 
 (** Build an index for a particular Data type. *)
