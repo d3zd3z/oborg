@@ -20,14 +20,29 @@ open Core
  *)
 
 module type KV = sig
+  type data
+  val key_len : int
+  val data_len : int
+
+  val get_data : Cstruct.t -> int -> data
 end
 
-module Index = struct
-  let key_len = 32
-  let data_len = 8
+module type INDEX = sig
+  type data
+  type t
+  val of_filename : string -> t
+  val find : t -> key:Cstruct.t -> data option
+
+  val dump_info : t -> unit
+  val iter : t -> f:(Cstruct.t -> unit) -> unit
+end
+
+module Make_index (Data : KV) : INDEX with type data = Data.data = struct
+
+  type data = Data.data
 
   let first_bucket = 18
-  let bucket_size = key_len + data_len
+  let bucket_size = Data.key_len + Data.data_len
 
   type t = {
     data : Cstruct.t;
@@ -51,10 +66,10 @@ module Index = struct
     let used = Int32.to_int_exn (Cstruct.LE.get_uint32 data 8) in
     let buckets = Int32.to_int_exn (Cstruct.LE.get_uint32 data 12) in
     let this_keylen = Cstruct.get_uint8 data 16 in
-    if this_keylen <> key_len then
+    if this_keylen <> Data.key_len then
       failwith "Index file not of right type (key len mismatch)";
     let this_datalen = Cstruct.get_uint8 data 17 in
-    if this_datalen <> data_len then
+    if this_datalen <> Data.data_len then
       failwith "Index file not of right type (data len mismatch)";
     let expected_len = first_bucket + bucket_size * buckets in
     if expected_len <> Cstruct.len data then
@@ -64,8 +79,8 @@ module Index = struct
   let iter t ~f =
     for pos = 0 to t.buckets - 1 do
       let base = first_bucket + pos * bucket_size in
-      let key = Cstruct.sub t.data base key_len in
-      match Cstruct.LE.get_uint32 t.data (base + key_len) with
+      let key = Cstruct.sub t.data base Data.key_len in
+      match Cstruct.LE.get_uint32 t.data (base + Data.key_len) with
         | 0xfffffffel | 0xffffffffl -> ()
         | _ -> f key
     done
@@ -80,12 +95,10 @@ module Index = struct
     let pos = Int63.to_int_exn Int63.(rem pos (of_int t.buckets)) in
     let rec loop pos =
       let base = first_bucket + bucket_size * pos in
-      if Cstruct.equal key (Cstruct.sub t.data base key_len) then begin
-        let first = Int32.to_int_exn (Cstruct.LE.get_uint32 t.data (base + key_len)) in
-        let second = Int32.to_int_exn (Cstruct.LE.get_uint32 t.data (base + key_len + 4)) in
-        Some (first, second)
+      if Cstruct.equal key (Cstruct.sub t.data base Data.key_len) then begin
+        Some (Data.get_data t.data (base + Data.key_len))
       end else begin
-        match Cstruct.LE.get_uint32 t.data (base + key_len) with
+        match Cstruct.LE.get_uint32 t.data (base + Data.key_len) with
           | -1l ->
               (* Indicates an empty bucket, which is our only stop
                * condition. *)

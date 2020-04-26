@@ -21,19 +21,31 @@ let get_index repo =
     | `Rebuild _ -> failwith "TODO: Out of date index"
     | `Built n -> n
 
+module SegmentKV : Hashindex.KV with type data = (int * int) = struct
+  type data = (int * int)
+  let key_len = 32
+  let data_len = 8
+  let get_data bin offset =
+    let first = Int32.to_int_exn (Cstruct.LE.get_uint32 bin offset) in
+    let second = Int32.to_int_exn (Cstruct.LE.get_uint32 bin (offset + 4)) in
+    (first, second)
+end
+
+module Index = Hashindex.Make_index (SegmentKV)
+
 let () =
   match Sys.get_argv () with
     | [| _; path |] ->
       let repo = Repo.openrepo path in
       (* printf "%s\n" (Repo.show repo); *)
       let lseg = get_index repo in
-      let hindex = Hashindex.Index.of_filename (Repo.index_file repo lseg) in
-      Hashindex.Index.dump_info hindex;
+      let hindex = Index.of_filename (Repo.index_file repo lseg) in
+      Index.dump_info hindex;
 
       (* Verify that the hashes can be found. *)
       let count = ref 0 in
-      Hashindex.Index.iter hindex ~f:(fun key ->
-        match Hashindex.Index.find hindex ~key with
+      Index.iter hindex ~f:(fun key ->
+        match Index.find hindex ~key with
           | Some (_, _) -> count := !count + 1
           | None -> failwith "Unable to find key");
       printf "Visited: %d\n" !count
