@@ -33,6 +33,8 @@ end
 
 module Index = Hashindex.Make_index (SegmentKV)
 
+let blank_hash = Cstruct.create 32
+
 let () =
   match Sys.get_argv () with
     | [| _; path |] ->
@@ -41,6 +43,13 @@ let () =
       let lseg = get_index repo in
       let hindex = Index.of_filename (Repo.index_file repo lseg) in
       Index.dump_info hindex;
+      Index.lookup_test hindex;
 
-      Index.lookup_test hindex
+      let seg, offset = Option.value_exn (Index.find hindex ~key:blank_hash) in
+      printf "seg=%d offset=%d\n" seg offset;
+      let name = Repo.segfile repo seg in
+      let seg = Segment.of_filename name in
+      let payload = Segment.read seg offset in
+      printf "(%d bytes)\n" (Cstruct.len payload);
+      Segment.decrypt payload (Repo.get_key repo)
     | _ -> failwith "Expecting a path argument"

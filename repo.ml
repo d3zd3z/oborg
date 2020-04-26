@@ -8,6 +8,9 @@ type t = {
 }
 [@@deriving show]
 
+let get_key t =
+  Option.value_exn t.conf.key
+
 (* For now, we only handle local repos, with either a repokey or a
  * separate keyfile. *)
 
@@ -39,7 +42,7 @@ let openrepo path =
 
 let segfile t n =
   sprintf "%s/data/%d/%d" t.path
-    (n mod t.conf.segments_per_dir)
+    (n / t.conf.segments_per_dir)
     n
 
 let index_file t n =

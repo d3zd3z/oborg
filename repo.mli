@@ -22,3 +22,5 @@ val index_file : t -> int -> string
  * rebuilt. *)
 val last_segment : t -> [ `None | `Built of int | `Rebuild of int * int array ]
 
+val get_key : t -> Keyfile.Key.t
+
