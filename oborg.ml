@@ -1,6 +1,7 @@
 (* Playing with oborg. *)
 
 open Core
+open Borg
 
 let kf () =
   let password = Cstruct.of_string "kao3ohBae0quaMohzu5eemaeghei3Gox8zu" in
