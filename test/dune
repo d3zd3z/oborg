@@ -1,4 +1,4 @@
 (test
   (name test)
-  (libraries core borg)
+  (libraries core borg shell fileutils)
   (preprocess (pps ppx_deriving.show)))

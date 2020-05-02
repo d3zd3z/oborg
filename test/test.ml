@@ -2,4 +2,7 @@
 
 open Core
 
-let () = printf "Tests would be here\n"
+let () = 
+  printf "dir:%!";
+  Dir.runtest();
+  printf " pass\n"
