@@ -1,8 +1,10 @@
 (* Borg interaction testing. *)
 
-open Core
+open OUnit2
+
+let suite = "suite" >::: [
+  "dir" >:: Dir.runtest;
+]
 
 let () = 
-  printf "dir:%!";
-  Dir.runtest();
-  printf " pass\n"
+  run_test_tt_main suite

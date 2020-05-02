@@ -15,4 +15,4 @@ val with_dir : f:(t -> 'a) -> 'a
 
 (**
  * Run an internal test of this module. *)
-val runtest : unit -> unit
+val runtest : OUnit2.test_ctxt -> unit

@@ -41,7 +41,7 @@ let with_dir ~f =
     | Ok result -> result
     | Error ex -> raise ex
 
-let runtest () =
+let runtest _ =
   let remember = ref None in
   with_dir ~f:(fun dir ->
     remember := Some dir;
