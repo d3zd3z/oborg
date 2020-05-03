@@ -24,3 +24,9 @@ val last_segment : t -> [ `None | `Built of int | `Rebuild of int * int array ]
 
 val get_key : t -> Keyfile.Key.t
 
+(**
+ * For testing, set an alternate home directory to look for keys, and
+ * cache files.  This corresponds with the BORG_BASE environment
+ * variable. *)
+val set_base : string -> unit
+val set_password : string -> unit

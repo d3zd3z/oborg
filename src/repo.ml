@@ -8,15 +8,21 @@ type t = {
 }
 [@@deriving show]
 
+(* The home directory defaults to, well, the home directory. *)
+let home_dir = ref (Sys.home_directory ())
+let set_base name = home_dir := name
+
 let get_key t =
   Option.value_exn t.conf.key
+
+let password = ref (Sys.getenv "BORG_PASSPHRASE"
+  |> Option.value_map ~default:Cstruct.empty ~f:Cstruct.of_string)
+let set_password p = password := Cstruct.of_string p
 
 (* For now, we only handle local repos, with either a repokey or a
  * separate keyfile. *)
 
-let getpass () =
-  Sys.getenv "BORG_PASSPHRASE"
-  |> Option.value_map ~default:Cstruct.empty ~f:Cstruct.of_string
+let getpass () = !password
 
 (* This handles the mangling, as long as the path is canonical, and is
  * a local filename. *)
@@ -34,7 +40,7 @@ let openrepo path =
   else begin
     let name = mangle_name path in
     (* TODO: Use Home directory, not this path. *)
-    let name = "/home/davidb/.config/borg/keys" ^/ name in
+    let name = !home_dir ^/ ".config/borg/keys" ^/ name in
     let key = Keyfile.load_key ~password name in
     { conf with key = Some key }
   end in
