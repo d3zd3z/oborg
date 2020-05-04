@@ -8,24 +8,26 @@ type t = {
 }
 [@@deriving show]
 
-type env = {
-  base : string option;
-  password : Cstruct.t option;
-}
+module Env = struct
+  type t = {
+    base : string option;
+    password : Cstruct.t option;
+  }
 
-let empty_env () = { base = None; password = None }
+  let empty_env () = { base = None; password = None }
 
-let default_env () =
-  let base = Some (Sys.home_directory ()) in
-  let password = Sys.getenv "BORG_PASSPHRASE" |> Option.map ~f:Cstruct.of_string in
-  { base; password }
+  let default_env () =
+    let base = Some (Sys.home_directory ()) in
+    let password = Sys.getenv "BORG_PASSPHRASE" |> Option.map ~f:Cstruct.of_string in
+    { base; password }
 
-type env_key = [ `Base | `Password ]
+  type key = [ `Base | `Password ]
 
-let set_env env key data =
-  match key with
-    | `Base -> { env with base = Some data }
-    | `Password -> { env with password = Some (Cstruct.of_string data) }
+  let set_env env key data =
+    match key with
+      | `Base -> { env with base = Some data }
+      | `Password -> { env with password = Some (Cstruct.of_string data) }
+end
 
 let get_key t =
   Option.value_exn t.conf.key
@@ -38,7 +40,7 @@ let mangle_name path =
     | xs -> xs in
   String.concat ~sep:"_" ff
 
-let openrepo env path =
+let openrepo (env : Env.t) path =
   let password = Option.value env.password ~default:(Cstruct.empty) in
   let home_dir = Option.value_exn env.base in
 

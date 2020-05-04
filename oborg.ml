@@ -39,7 +39,7 @@ let blank_hash = Cstruct.create 32
 let () =
   match Sys.get_argv () with
     | [| _; path |] ->
-      let env = Repo.default_env () in
+      let env = Repo.Env.default_env () in
       let repo = Repo.openrepo env path in
       (* printf "%s\n" (Repo.show repo); *)
       let lseg = get_index repo in

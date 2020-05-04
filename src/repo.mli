@@ -4,27 +4,29 @@
 
 type t [@@deriving show]
 
-(**
- * Open a repo depends on some values that Borg passes in through the
- * environment (along with defaults).  To support testing, we allow
- * these to come from either the environment, the environment,
- * modified by the command line, or just set (as in a test). *)
-type env
+module Env : sig
+  (**
+   * Open a repo depends on some values that Borg passes in through the
+   * environment (along with defaults).  To support testing, we allow
+   * these to come from either the environment, the environment,
+   * modified by the command line, or just set (as in a test). *)
+  type t
 
-(** Query the environment to get values. *)
-val default_env : unit -> env
+  (** Query the environment to get values. *)
+  val default_env : unit -> t
 
-(** Start with an empty environment (used by testing to make sure
- * these values do not come from the real environment. *)
-val empty_env : unit -> env
+  (** Start with an empty environment (used by testing to make sure
+   * these values do not come from the real environment. *)
+  val empty_env : unit -> t
 
-(** Possible values set in the environment. *)
-type env_key = [ `Base | `Password ]
+  (** Possible values set in the environment. *)
+  type key = [ `Base | `Password ]
 
-(** Modify a value.  This can be either an override. *)
-val set_env : env -> env_key -> string -> env
+  (** Modify a value.  This can be either an override. *)
+  val set_env : t -> key -> string -> t
+end
 
-val openrepo : env -> string -> t
+val openrepo : Env.t -> string -> t
 
 (** Given a segment number, return the pathname for the file
  * for that segment. *)
