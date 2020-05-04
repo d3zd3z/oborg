@@ -8,21 +8,27 @@ type t = {
 }
 [@@deriving show]
 
-(* The home directory defaults to, well, the home directory. *)
-let home_dir = ref (Sys.home_directory ())
-let set_base name = home_dir := name
+type env = {
+  base : string option;
+  password : Cstruct.t option;
+}
+
+let empty_env () = { base = None; password = None }
+
+let default_env () =
+  let base = Some (Sys.home_directory ()) in
+  let password = Sys.getenv "BORG_PASSPHRASE" |> Option.map ~f:Cstruct.of_string in
+  { base; password }
+
+type env_key = [ `Base | `Password ]
+
+let set_env env key data =
+  match key with
+    | `Base -> { env with base = Some data }
+    | `Password -> { env with password = Some (Cstruct.of_string data) }
 
 let get_key t =
   Option.value_exn t.conf.key
-
-let password = ref (Sys.getenv "BORG_PASSPHRASE"
-  |> Option.value_map ~default:Cstruct.empty ~f:Cstruct.of_string)
-let set_password p = password := Cstruct.of_string p
-
-(* For now, we only handle local repos, with either a repokey or a
- * separate keyfile. *)
-
-let getpass () = !password
 
 (* This handles the mangling, as long as the path is canonical, and is
  * a local filename. *)
@@ -32,15 +38,16 @@ let mangle_name path =
     | xs -> xs in
   String.concat ~sep:"_" ff
 
-let openrepo path =
-  let password = getpass () in
+let openrepo env path =
+  let password = Option.value env.password ~default:(Cstruct.empty) in
+  let home_dir = Option.value_exn env.base in
 
   let conf = Configfile.load ~password (path ^/ "config") in
   let conf = if Option.is_some conf.key then conf
   else begin
     let name = mangle_name path in
     (* TODO: Use Home directory, not this path. *)
-    let name = !home_dir ^/ ".config/borg/keys" ^/ name in
+    let name = home_dir ^/ ".config/borg/keys" ^/ name in
     let key = Keyfile.load_key ~password name in
     { conf with key = Some key }
   end in
