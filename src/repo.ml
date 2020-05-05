@@ -33,8 +33,10 @@ let get_key t =
   Option.value_exn t.conf.key
 
 (* This handles the mangling, as long as the path is canonical, and is
- * a local filename. *)
+ * a local filename.  This replaces '/' and '.' in the name with
+ * underscores.  It might replace other characters as well. *)
 let mangle_name path =
+  let path = String.substr_replace_all ~pattern:"." ~with_:"_" path in
   let ff = match String.split ~on:'/' path with
     | (""::xs) -> xs
     | xs -> xs in
