@@ -1,0 +1,4 @@
+(test
+  (name test)
+  (libraries core borg ounit2 shell fileutils)
+  (preprocess (pps ppx_deriving.show)))
