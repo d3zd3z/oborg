@@ -26,6 +26,9 @@ module type INDEX = sig
     * it is unable to open the index. *)
   val of_filename : string -> t
 
+  (** Construct an empty hashindex. *)
+  val make_empty : unit -> t
+
   (** Look up a given key in the index, and return it if it is
    * present. *)
   val find : t -> key:Cstruct.t -> data option

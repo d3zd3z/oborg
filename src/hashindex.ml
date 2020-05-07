@@ -19,6 +19,29 @@ open Core
  * 18      first bucket
  *)
 
+(* Hash size table.  This is copied out of the borg code (with the
+ * values made into Int32s).  The values were chosen to fit in a
+ * signed 32-bit int. *)
+let hash_sizes = [|
+    1031; 2053; 4099; 8209; 16411; 32771; 65537; 131101; 262147; 445649;
+    757607; 1287917; 2189459; 3065243; 4291319; 6007867; 8410991;
+    11775359; 16485527; 23079703; 27695653; 33234787; 39881729; 47858071;
+    57429683; 68915617; 82698751; 99238507; 119086189; 144378011; 157223263;
+    173476439; 190253911; 209915011; 230493629; 253169431; 278728861;
+    306647623; 337318939; 370742809; 408229973; 449387209; 493428073;
+    543105119; 596976533; 657794869; 722676499; 795815791; 874066969;
+    962279771;
+    (*
+     * Realistically, we can't even get close to these sizes on a
+     * 32-bit platform.  Since the offsets to the Cstruct are 'int'
+     * values, we won't be able to index past these values on these
+     * platforms.  We'll leave these in for now, so that we get a
+     * clear overflow of a constant at compile time on a 32-bit
+     * platform.
+     *)
+    1057701643; 1164002657; 1280003147; 1407800297; 1548442699;
+    1703765389; 1873768367; 2062383853 |]
+
 module type KV = sig
   type data
   val key_len : int
@@ -31,6 +54,7 @@ module type INDEX = sig
   type data
   type t
   val of_filename : string -> t
+  val make_empty : unit -> t
   val find : t -> key:Cstruct.t -> data option
 
   val dump_info : t -> unit
@@ -76,6 +100,14 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
     if expected_len <> Cstruct.len data then
       failwith "Index file seems of incorrect length";
     { data; used; buckets }
+
+  let make_sized buckets =
+    let bsize = first_bucket + bucket_size * buckets in
+    let data = Cstruct.create bsize in
+    { data; used = 0; buckets }
+
+  let make_empty () =
+    make_sized hash_sizes.(0)
 
   let iter t ~f =
     for pos = 0 to t.buckets - 1 do
