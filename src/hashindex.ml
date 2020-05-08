@@ -81,6 +81,26 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
       t.used t.buckets
       Float.(of_int t.used / of_int t.buckets * 100.0)
 
+  let pos_of_key t ~key =
+    (* This is a bit messy as we don't have real unsigned ints in
+     * ocaml.  We can take advantage of the int63 type, which will
+     * either be a regular int on a 64-bit platform, or a 64 bit value
+     * on 32-bit platforms. *)
+    let pos = Cstruct.LE.get_uint32 key 0 in
+    let pos = Int63.(of_int32 pos land of_int64_exn 0xffffffffL) in
+    Int63.to_int_exn Int63.(rem pos (of_int t.buckets))
+
+  let get_key t pos =
+    let base = first_bucket + pos * bucket_size in
+    Cstruct.sub t.data base Data.key_len
+
+  let key_equal t pos key =
+    Cstruct.equal key (get_key t pos)
+
+  let get_flag t pos =
+    let base = first_bucket + pos * bucket_size in
+    Cstruct.LE.get_uint32 t.data (base + Data.key_len)
+
   let of_filename path =
     let fd = Unix.openfile path ~mode:[Unix.O_RDONLY] in
     let data = Unix_cstruct.of_fd fd in
@@ -112,26 +132,20 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
   let iter t ~f =
     for pos = 0 to t.buckets - 1 do
       let base = first_bucket + pos * bucket_size in
-      let key = Cstruct.sub t.data base Data.key_len in
+      let key = get_key t pos in
       match Cstruct.LE.get_uint32 t.data (base + Data.key_len) with
         | 0xfffffffel | 0xffffffffl -> ()
         | _ -> f key
     done
 
   let find t ~key =
-    (* This is a bit messy as we don't have real unsigned ints in
-     * ocaml.  We can take advantage of the int63 type, which will
-     * either be a regular int on a 64-bit platform, or a 64 bit value
-     * on 32-bit platforms. *)
-    let pos = Cstruct.LE.get_uint32 key 0 in
-    let pos = Int63.(of_int32 pos land of_int64_exn 0xffffffffL) in
-    let pos = Int63.to_int_exn Int63.(rem pos (of_int t.buckets)) in
+    let pos = pos_of_key t ~key in
     let rec loop pos =
       let base = first_bucket + bucket_size * pos in
-      if Cstruct.equal key (Cstruct.sub t.data base Data.key_len) then begin
+      if key_equal t pos key then begin
         Some (Data.get_data t.data (base + Data.key_len))
       end else begin
-        match Cstruct.LE.get_uint32 t.data (base + Data.key_len) with
+        match get_flag t pos with
           | -1l ->
               (* Indicates an empty bucket, which is our only stop
                * condition. *)
