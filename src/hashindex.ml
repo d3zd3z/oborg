@@ -101,6 +101,10 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
     let base = first_bucket + pos * bucket_size in
     Cstruct.LE.get_uint32 t.data (base + Data.key_len)
 
+  let set_flag t pos value =
+    let base = first_bucket + pos * bucket_size in
+    Cstruct.LE.set_uint32 t.data (base + Data.key_len) value
+
   let of_filename path =
     let fd = Unix.openfile path ~mode:[Unix.O_RDONLY] in
     let data = Unix_cstruct.of_fd fd in
@@ -124,7 +128,11 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
   let make_sized buckets =
     let bsize = first_bucket + bucket_size * buckets in
     let data = Cstruct.create bsize in
-    { data; used = 0; buckets }
+    let t = { data; used = 0; buckets } in
+    for i = 0 to buckets - 1 do
+      set_flag t i 0xffffffffl
+    done;
+    t
 
   let make_empty () =
     make_sized hash_sizes.(0)
