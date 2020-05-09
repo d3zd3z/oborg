@@ -30,6 +30,8 @@ module SegmentKV : Hashindex.KV with type data = (int * int) = struct
     let first = Int32.to_int_exn (Cstruct.LE.get_uint32 bin offset) in
     let second = Int32.to_int_exn (Cstruct.LE.get_uint32 bin (offset + 4)) in
     (first, second)
+  let set_data _bin _offset (_first, _second) =
+    failwith "Set data"
 end
 
 module Index = Hashindex.Make_index (SegmentKV)

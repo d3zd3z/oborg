@@ -48,6 +48,7 @@ module type KV = sig
   val data_len : int
 
   val get_data : Cstruct.t -> int -> data
+  val set_data : Cstruct.t -> int -> data -> unit
 end
 
 module type INDEX = sig
@@ -57,6 +58,7 @@ module type INDEX = sig
   val write_file : t -> string -> unit
   val make_empty : unit -> t
   val find : t -> key:Cstruct.t -> data option
+  val insert : t -> key:Cstruct.t -> data:data -> unit
 
   val dump_info : t -> unit
   val iter : t -> f:(Cstruct.t -> unit) -> unit
@@ -72,7 +74,7 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
 
   type t = {
     data : Cstruct.t;
-    used : int;
+    mutable used : int;
     buckets : int;
   }
 
@@ -97,6 +99,10 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
 
   let key_equal t pos key =
     Cstruct.equal key (get_key t pos)
+
+  let put_key t pos key =
+    let base = first_bucket + pos * bucket_size in
+    Cstruct.blit key 0 t.data base Data.key_len
 
   let get_flag t pos =
     let base = first_bucket + pos * bucket_size in
@@ -182,6 +188,28 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
               loop pos
       end in
     loop pos
+
+  let insert t ~key ~data =
+    let pos = pos_of_key t ~key in
+    let rec loop pos =
+      if key_equal t pos key then begin
+        (* This is a replacement. *)
+        failwith "TODO: Replace"
+      end else begin
+        match get_flag t pos with
+          | -1l | -2l ->
+              (* Empty bucket this would be a good place to insert. *)
+              put_key t pos key;
+              let base = first_bucket + bucket_size * pos in
+              Data.set_data t.data (base + Data.key_len) data
+          | _ ->
+              (* Mismatch, move on. *)
+              let pos = pos + 1 in
+              let pos = if pos = t.buckets then 0 else pos in
+              loop pos
+      end in
+    loop pos;
+    t.used <- t.used + 1
 
   let twiddle key offset =
     let key = Cstruct.copy key 0 Data.key_len in
