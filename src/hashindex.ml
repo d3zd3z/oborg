@@ -54,6 +54,7 @@ module type INDEX = sig
   type data
   type t
   val of_filename : string -> t
+  val write_file : t -> string -> unit
   val make_empty : unit -> t
   val find : t -> key:Cstruct.t -> data option
 
@@ -125,9 +126,24 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
       failwith "Index file seems of incorrect length";
     { data; used; buckets }
 
+  (* The field "used buckets" is set as part of write.  All other
+   * fields should have already been initialized. *)
+  let write_file t path =
+    Cstruct.LE.set_uint32 t.data 8 (Int32.of_int_exn t.used);
+    let tname = path ^ ".tmp" in
+    let fd = Unix.openfile tname ~mode:[Unix.O_WRONLY; Unix.O_CREAT; Unix.O_EXCL] in
+    let count = Bigstring.write fd (Cstruct.to_bigarray t.data) in
+    if count <> Cstruct.len t.data then
+      failwith "Unable to write file";
+    Unix.rename ~src:tname ~dst:path
+
   let make_sized buckets =
     let bsize = first_bucket + bucket_size * buckets in
     let data = Cstruct.create bsize in
+    Cstruct.blit_from_string "BORG_IDX" 0 data 0 8;
+    Cstruct.LE.set_uint32 data 12 (Int32.of_int_exn buckets);
+    Cstruct.set_uint8 data 16 Data.key_len;
+    Cstruct.set_uint8 data 17 Data.data_len;
     let t = { data; used = 0; buckets } in
     for i = 0 to buckets - 1 do
       set_flag t i 0xffffffffl

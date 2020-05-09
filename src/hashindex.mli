@@ -26,6 +26,9 @@ module type INDEX = sig
     * it is unable to open the index. *)
   val of_filename : string -> t
 
+  (** Write out this hashindex to the given file. *)
+  val write_file : t -> string -> unit
+
   (** Construct an empty hashindex. *)
   val make_empty : unit -> t
 
