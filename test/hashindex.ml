@@ -28,6 +28,9 @@ end
 
 module Index = Borg.Hashindex.Make_index (Ipair)
 
+(* Just make the second value some offset of the original. *)
+let makeb a = a * 17 + 37
+
 (* Add entries [n,m) to the table, augmenting the local set to contain
  * the entries we have inserted. *)
 let add_entries hi s n m =
@@ -35,8 +38,9 @@ let add_entries hi s n m =
     if i >= m then s
     else begin
       let s = ISet.add s i in
-      let key = Ipair.get_hash (i, i) in
-      Index.insert hi ~key ~data:(i, i);
+      let data = (i, makeb i) in
+      let key = Ipair.get_hash data in
+      Index.insert hi ~key ~data;
       loop s (i + 1)
     end in
   loop s n
@@ -49,7 +53,7 @@ let check_entries hi s =
     match Index.find hi ~key with
       | None -> failwith "Unable to find key"
       | Some (a, b) ->
-          if a <> b then failwith "Invalid data item";
+          if b <> makeb a then failwith "Invalid data item";
           let key2 = Ipair.get_hash (a, b) in
           if not (Cstruct.equal key key2) then
             failwith "Key and data mismatch";
