@@ -3,6 +3,6 @@ all:
 clean:
 	dune clean
 test:
-	dune runtest
+	dune runtest -f
 
 .PHONY: test all clean
