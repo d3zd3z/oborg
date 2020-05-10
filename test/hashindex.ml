@@ -64,7 +64,7 @@ let check_entries hi s =
     failwith "Items missing from hashindex"
 
 let runtest _ =
-  let to_add = 500 in
+  let to_add = 20000 in
   Dir.with_dir ~f:(fun dir ->
     let hiname = dir ^/ "index.0" in
     let h = Index.make_empty () in

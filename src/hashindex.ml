@@ -42,6 +42,19 @@ let hash_sizes = [|
     1057701643; 1164002657; 1280003147; 1407800297; 1548442699;
     1703765389; 1873768367; 2062383853 |]
 
+(* Find the next size in the hash_sizes that is larger than the passed
+ * in number. *)
+let embiggen size =
+  let len = Array.length hash_sizes in
+  let rec loop n =
+    if n = len then failwith "Hash bucket overflow";
+    if hash_sizes.(n) > size then
+      hash_sizes.(n)
+    else
+      loop (n+1)
+  in
+  loop 0
+
 module type KV = sig
   type data
   val key_len : int
@@ -73,9 +86,9 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
   let bucket_size = Data.key_len + Data.data_len
 
   type t = {
-    data : Cstruct.t;
+    mutable data : Cstruct.t;
     mutable used : int;
-    buckets : int;
+    mutable buckets : int;
   }
 
   let dump_info t =
@@ -111,6 +124,17 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
   let set_flag t pos value =
     let base = first_bucket + pos * bucket_size in
     Cstruct.LE.set_uint32 t.data (base + Data.key_len) value
+
+  (** There are two limits that can cause a rebuild.  The first is if
+    * the number of entries exceeds a threshold of 3/4 full.  To match
+    * the Borg code, we check the threshold before increasing it for the
+    * new value, which means the table can exist with one extra element.
+    * In addition, we can also check that there is a minimal number of
+    * empty cells (as opposed to tombstones), and if this is not met,
+    * perform a same-size rebuild.
+    * For the index over the segment files, we don't compact. *)
+  let expand_limit t =
+    Float.(of_int t.used > of_int t.buckets * 0.75)
 
   let of_filename path =
     let fd = Unix.openfile path ~mode:[Unix.O_RDONLY] in
@@ -189,7 +213,7 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
       end in
     loop pos
 
-  let insert t ~key ~data =
+  let raw_insert t ~key ~data =
     let pos = pos_of_key t ~key in
     let rec loop pos =
       if key_equal t pos key then begin
@@ -210,6 +234,25 @@ module Make_index (Data : KV) : INDEX with type data = Data.data = struct
       end in
     loop pos;
     t.used <- t.used + 1
+
+  let expand t =
+    let new_size = embiggen t.buckets in
+    let old = { t with data = t.data } in
+    let nn = make_sized new_size in
+    t.data <- nn.data;
+    t.buckets <- nn.buckets;
+    t.used <- 0;
+    (* TODO: Make an iter that returns the data as well *)
+    iter old ~f:(fun key ->
+      let data = match find old ~key with
+        | None -> failwith "Key error"
+        | Some data -> data in
+      raw_insert t ~key ~data)
+
+  let insert t ~key ~data =
+    if expand_limit t then
+      expand t;
+    raw_insert t ~key ~data
 
   let twiddle key offset =
     let key = Cstruct.copy key 0 Data.key_len in
