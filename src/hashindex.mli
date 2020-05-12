@@ -11,6 +11,7 @@ module type KV = sig
   val data_len : int
 
   val get_data : Cstruct.t -> int -> data
+  val set_data : Cstruct.t -> int -> data -> unit
 end
 
 (** Implement Hashindex for a given stored data type. *)
@@ -26,9 +27,18 @@ module type INDEX = sig
     * it is unable to open the index. *)
   val of_filename : string -> t
 
+  (** Write out this hashindex to the given file. *)
+  val write_file : t -> string -> unit
+
+  (** Construct an empty hashindex. *)
+  val make_empty : unit -> t
+
   (** Look up a given key in the index, and return it if it is
    * present. *)
   val find : t -> key:Cstruct.t -> data option
+
+  (** Add/replace an entry in the index. *)
+  val insert : t -> key:Cstruct.t -> data:data -> unit
 
   (** Pring some information about the hashindex. *)
   val dump_info : t -> unit
